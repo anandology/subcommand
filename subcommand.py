@@ -41,7 +41,7 @@ class Program:
             subcommand_lookup[cmd](args)
         else:
             print >> sys.stderr, "Unknown command:", cmd
-            print >> sys.stderr, "Type '%s help' for usage." % program_name
+            print >> sys.stderr, "Type '%s help' for usage." % prog.name
 
 class SubCommand:
     def __init__(self, func, name, aliases, help, options):
@@ -106,7 +106,10 @@ class Option(optparse.Option):
     """
     def __repr__(self):
         opts = self._short_opts + self._long_opts
-        return xrepr("Option", type=self.type, dest=self.dest, help=self.help, *opts)
+        kw = dict(type=self.type, dest=self.dest, help=self.help)
+        if self.default != ('NO', 'DEFAULT'):
+            kw['default'] = self.default
+        return xrepr("Option", *opts, **kw)
 
     def __str__(self):
         opts = self._short_opts + self._long_opts
@@ -148,25 +151,34 @@ def parse_option(line):
     Option('-v', '--verbose', dest='verbose', help='Turn on verbose output')
     >>> parse_option('-f [--config] configfile   : config file')
     Option('-f', '--config', dest='configfile', type='string', help='config file')
-    >>> parse_option('-p [--port] port int   : port')
+    >>> parse_option('-p [--port] port  : port (type: int)')
+    Option('-p', '--port', dest='port', type='int', help='port')
+    >>> parse_option('-f [--config] configfile   : config file (default: hello.conf)')
+    Option('-f', '--config', dest='configfile', default='hello.conf', type='string', help='config file')
+    >>> parse_option('-p [--port] port : port (type: int)')
     Option('-p', '--port', dest='port', type='int', help='port')
     """
-    options, help = line.rsplit(':', 1)
+    options, help = line.split(':', 1)
 
     options = [x for x in re.split(" +|\[|\]", options) if x]
     options, option_desc = [x for x in options if x.startswith('-')], [x for x in options if not x.startswith('-')]
 
-    opt = Option(help=help.strip(), *options)
+    tokens = re.split("\(([^\(\)]*)\)", help)
+    help = tokens[0].strip()
 
-    if len(option_desc) == 0:
+    tokens = [t.split(':', 1) for t in tokens[1:] if ':' in t]
+    kw = dict((k.strip(), v.strip()) for k, v in tokens)
+
+    if 'default' in kw:
+        help = help + " (default: %s)" % kw['default']
+
+    opt = Option(help=help.strip(), *options, **kw)
+
+    if option_desc:
+        opt.dest = option_desc[0]
+    else:
         opt.action = "store_true"
         opt.type = None
-    elif len(option_desc) == 1:
-        opt.dest = option_desc[0]
-    elif len(option_desc) == 2:
-        opt.dest = option_desc[0]
-        opt.type = option_desc[1]
-    
     return opt
 
 def parse_options(options, args):

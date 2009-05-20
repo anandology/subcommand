@@ -53,7 +53,7 @@ class SubCommand:
         self.help = help or _help
         self.options = options or _options
 
-    def __call__(self, args):
+    def __call__(self, args=[]):
         options, args = parse_options(self.options, args)
         return self.func(options, *args)
 
@@ -92,7 +92,7 @@ def subcommand(name=None, aliases=[], help=None, options=None):
         subcommand_lookup[cmd.name] = cmd
         for alias in cmd.aliases:
             subcommand_lookup[alias] = cmd
-        return f
+        return cmd
     return decorator
 
 def xrepr(name, *a, **kw):
